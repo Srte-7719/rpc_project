@@ -1,0 +1,17 @@
+# 忽略编译产物和临时文件
+build/
+build-tmp/
+release-install-cpp11/
+*.o
+*.a
+*.so
+*.log
+*.tmp
+compile_commands.json
+
+# 忽略编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
