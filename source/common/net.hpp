@@ -1,5 +1,5 @@
 #pragma once
-#include "common/logger.h"
+#include "logger.h"
 #include "abstract.hpp"
 #include "fields.hpp"
 #include "message.hpp"
@@ -18,6 +18,7 @@
 #include <iostream>
 #include <mutex>
 #include <unordered_map>
+#include "../client/requestor.hpp"
 
 namespace json_rpc
 {

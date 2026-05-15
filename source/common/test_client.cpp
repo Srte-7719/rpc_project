@@ -2,7 +2,7 @@
 #include "net.hpp"
 #include <iostream>
 #include <unistd.h>
-#include "common/uuid.h"
+#include "uuid.h"
 
 // 客户端收到服务器响应的回调
 void onClientResponse(const json_rpc::BaseConnection::ptr& conn, json_rpc::BaseMessage::ptr& msg)
@@ -12,7 +12,6 @@ void onClientResponse(const json_rpc::BaseConnection::ptr& conn, json_rpc::BaseM
     // 类型转换，打印响应结果
     auto rpc_rsp = std::dynamic_pointer_cast<json_rpc::RpcResponse>(msg);
     if (rpc_rsp) {
-        // ✅ 修复1：枚举类型转成int再输出，或用errReason函数
         std::cout << "[Client] 响应码: " << static_cast<int>(rpc_rsp->rcode()) 
                   << " (" << json_rpc::errReason(rpc_rsp->rcode()) << ")" << std::endl;
         std::cout << "[Client] 响应结果: " << rpc_rsp->result().asInt() << std::endl;
@@ -21,13 +20,11 @@ void onClientResponse(const json_rpc::BaseConnection::ptr& conn, json_rpc::BaseM
 
 int main()
 {
-    // 1. 创建协议对象
+
     auto protocol = json_rpc::ProtocolFactory::create<json_rpc::LVProtocol>();
     
-    // 2. 创建客户端：连接 127.0.0.1:9090
     auto client = json_rpc::ClientFactory::create<json_rpc::MuduoClient>("127.0.0.1", 9090, protocol);
     
-    // 3. 设置响应回调 ✅ 修复3：去掉多余的cb:前缀
     client->setMessageCallback(onClientResponse);
     
     // 4. 连接服务器
