@@ -3,8 +3,8 @@
 #include "abstract.hpp"
 #include "fields.hpp"
 #include "message.hpp"
-#include <cstddef>
-#include <linux/limits.h>
+#include <cstddef>// 定义size_t类型
+#include <linux/limits.h>// 限制文件路径长度
 #include <memory>
 #include <muduo/net/Callbacks.h>
 #include <muduo/net/EventLoop.h> // 事件循环
@@ -18,18 +18,22 @@
 #include <iostream>
 #include <mutex>
 #include <unordered_map>
-#include "../client/requestor.hpp"
 
 namespace json_rpc
 {
+   //muduo缓冲区类，用于封装muduo库的缓冲区
     class MuduoBuffer: public BaseBuffer{
         public:
          using ptr = std::shared_ptr<MuduoBuffer>;
          MuduoBuffer(muduo::net::Buffer* buffer) : _buffer(buffer) 
          {}
+
+         //查看可读数据的字节数
          virtual size_t readableSize() override {
             return _buffer->readableBytes();
          }
+
+         //查看32位整数
          virtual int32_t peekInt32() override {
             //muduo库是一个网络库，从缓存区取出一个4字节整形，会进行网络字节序的转换
             //这里返回的是主机字节序的整数
@@ -51,10 +55,11 @@ namespace json_rpc
          }
 
          private:
-          muduo::net::Buffer *_buffer;//对象是别人创建的，我们只是持有指针
+          muduo::net::Buffer *_buffer;//对象是别人创建的，我们只是持有指针*
     };
 
 
+    //缓冲区工厂类，用于创建缓冲区对象
     class BufferFactory{
       public:
       template<typename T, typename ...Arg>
@@ -71,7 +76,7 @@ namespace json_rpc
          
         //检查是否可以处理消息
         virtual bool canProcessed(const BaseBuffer::ptr &buffer) override {
-            int32_t total_len = buffer->peekInt32();
+            int32_t total_len = buffer->peekInt32();//查看的是消息长度
             //检查是否还有足够的数据
             if(buffer->readableSize() < (total_len)) {
                 return false;
@@ -213,8 +218,6 @@ namespace json_rpc
          private:
          void onConnection(const muduo::net::TcpConnectionPtr &conn)
          {
-
-            
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;

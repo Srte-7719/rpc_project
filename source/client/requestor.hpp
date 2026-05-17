@@ -52,6 +52,8 @@ namespace json_rpc {
                 delDescribe(rid);//删除请求描述
             }
 
+            //发送请求
+            //返回值是异步调用的响应
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, AsyncResponse &async_rsp) {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_ASYNC);
                 if (!rdp) {
@@ -63,6 +65,8 @@ namespace json_rpc {
                 return true;
             }
 
+            //发送请求，等待响应
+            //阻塞等待异步调用响应
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, BaseMessage::ptr &rsp) {
                 AsyncResponse rsp_future;
                 bool ret = send(conn, req, rsp_future);
@@ -73,6 +77,8 @@ namespace json_rpc {
                 return true;
             }
 
+            //发送请求，等待响应
+            //阻塞等待异步调用响应
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, const RequestCallback &cb) {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_CALLBACK, cb);// 创建请求描述，类型是回调
                 if (!rdp) {
@@ -85,6 +91,8 @@ namespace json_rpc {
 
 
             private:
+
+            //创建请求描述
               RequestDescribe::ptr newDescribe(const BaseMessage::ptr &req, RType rtype, const RequestCallback &cb = RequestCallback())
               {
                 std::unique_lock<std::mutex> lock(_mutex);

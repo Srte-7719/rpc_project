@@ -92,8 +92,9 @@ namespace json_rpc {
                     }
                     return true;
                 }
+
             private:
-                //回调函数模式 用的
+                //回调函数模式的辅助回调函数
                 void handleCallbackResponse(const JsonResponseCallback &cb,const BaseMessage::ptr &msg)
                 {
                     //转成RpcResponse

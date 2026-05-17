@@ -4,6 +4,9 @@
 
 namespace json_rpc
 {
+    //回调函数基类
+    //所有回调函数都必须继承自这个基类
+    //回调函数必须实现onMessage方法
     class Callback{
         public:
             using ptr = std::shared_ptr<Callback>;
@@ -13,12 +16,15 @@ namespace json_rpc
     };
 
     template<typename T>
+    //具体类型的消息回调函数
+    //用户注册的业务处理函数，必须是这个类型的对象
     class CallbackT : public Callback{
         public:
             using ptr = std::shared_ptr<CallbackT<T>>;
             //处理消息,连接对象 + 具体类型的消息
             using MessageCallback = std::function<void(const BaseConnection::ptr &conn, std::shared_ptr<T> &msg)>;
             //构造函数保存用户传来的业务处理函数
+
             CallbackT(const MessageCallback &handler):handler_(handler){
 
             }
@@ -44,6 +50,7 @@ namespace json_rpc
                 _handlers.insert(std::make_pair(mtype, cb));
             }
 
+            //分发消息
             void onMessage(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
             {
                 std::lock_guard<std::mutex> lock(_mutex);

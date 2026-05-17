@@ -8,7 +8,7 @@
 namespace json_rpc {
         typedef std::pair<std::string, int> Address;
 
-  
+        //Json消息
     class JsonMessage : public BaseMessage{
         public:
             using ptr = std::shared_ptr<JsonMessage>;
@@ -31,16 +31,19 @@ namespace json_rpc {
     };
 
 
+    //Json请求
     class JsonRequest: public JsonMessage{
         public:
             using ptr = std::shared_ptr<JsonRequest>;
     };
 
 
+    //Json响应
     class JsonResponse: public JsonMessage{
         public:
             using ptr = std::shared_ptr<JsonResponse>;
-            virtual bool check() override
+            //确认是一个合法的响应，所有响应都必须有rcode，子类RpcResponse/ServiceResponse再检查自己特有的字段
+            virtual bool check() override//收消息的时候用
             {
                 //判断响应状态码是否存在
                 if(_body[KEY_RCODE].isNull() == true)
@@ -56,12 +59,12 @@ namespace json_rpc {
                 }
                 return true;
             }
-             //获取响应码
+             //获取响应码看看别人处理成功还是失败
            virtual RCode rcode() const
             {
                 return static_cast<RCode>(_body[KEY_RCODE].asInt());
             }
-            //设置响应码
+            //设置响应码，服务端处理完请求，准备返回结果的时候设置
             virtual void setRcode(const RCode code) 
             {
                 _body[KEY_RCODE] = (int)code;
@@ -188,7 +191,7 @@ namespace json_rpc {
                 }
                 
 
-                if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_REGISTER)
+                if (_body[KEY_OPTYPE].asInt() == (int)ServiceOptype::SERVICE_REGISTRY)
                 {
                      //主机信息
                 if(_body[KEY_HOST].isNull() == true || _body[KEY_HOST].isObject() == false)
@@ -315,6 +318,14 @@ namespace json_rpc {
                   }
                 }
                 return true;
+            }
+            //获取操作类型
+            ServiceOptype optype() {
+                return (ServiceOptype)_body[KEY_OPTYPE].asInt();
+            }
+            //设置操作类型
+            void setOptype(ServiceOptype optype) {
+                _body[KEY_OPTYPE] = (int)optype;
             }
             //获取方法名
             std::string method()
