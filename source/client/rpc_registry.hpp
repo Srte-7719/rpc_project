@@ -70,6 +70,11 @@ namespace json_rpc {
                     size_t pos = _idx++ % _hosts.size();
                     return _hosts[pos];//原子性不用_idx = (_idx + 1) % _hosts.size();
                 }
+                //判断是否为空
+                bool empty() {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                     return _hosts.empty();
+                }
             private:
                 std::mutex _mutex;
                 size_t _idx;
@@ -82,15 +87,88 @@ namespace json_rpc {
         class Discoverer{
             public:
             using OfflineCallback = std::function<void(const Address&)>;
+            using ptr = std::shared_ptr<Discoverer>;
             Discoverer(const Requestor::ptr &requestor, const OfflineCallback &cb) : _requestor(requestor), _offline_callback(cb){}
             //服务发现
             bool serviceDiscovery(const BaseConnection::ptr &conn, const std::string &method, Address &host) {
-                std::unique_lock<std::mutex> lock(_mutex);
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    //根据方法名查找主机
+                    auto it = _method_hosts.find(method);
+                    if (it != _method_hosts.end()) {
+                        if (it->second->empty() == false) {
+                            host = it->second->chooseHost();
+                            return true;
+                        }
+                    }
+                }
 
+                //当前服务的提供者为空
+                auto msg_req = MessageFactory::create<ServiceRequest>();
+                msg_req->setId(UUID::generate_uuid());
+                msg_req->setMtype(MType::REQ_SERVICE);
+                msg_req->setMethod(method);
+                msg_req->setServiceOptype(ServiceOptype::SERVICE_DISCOVERY);
+                BaseMessage::ptr msg_rsp;
+                bool ret = _requestor->send(conn, msg_req, msg_rsp);
+
+                 if (ret == false) {
+                    LOG_ERROR("服务发现失败！");
+                    return false;
+                 }
+
+                 
+                 auto service_rsp = std::dynamic_pointer_cast<ServiceResponse>(msg_rsp);
+                 if (!service_rsp) {
+                    LOG_ERROR("服务发现失败！响应类型转换失败！");
+                    return false;
+                 }
+                 if (service_rsp->rcode() != RCode::RCODE_OK) {
+                    LOG_ERROR("服务发现失败，原因：%s", errReason(service_rsp->rcode()).c_str());
+                    return false;
+                 }
+
+                 //当前无对应的服务提供主机
+                 std::unique_lock<std::mutex> lock(_mutex);
+                 auto method_host = std::make_shared<MethodHost>(service_rsp->Hosts());
+                 if (method_host->empty()) {
+                    LOG_ERROR("%s 服务发现失败！没有能够提供服务的主机！", method.c_str());
+                    return false;
+                 }
+                  host = method_host->chooseHost();
+                 _method_hosts[method] = method_host;
+                return true;
             }
-           //给Dispatcher模块进行服务上线下线请求处理的回调函数
-            void onServiceRequest(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg) {
 
+            void onServiceRequest(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg) {
+                 //判断上线还是下线，如果都不是那就不用处理了
+                auto optype = msg->serviceOptype();
+                 std::string method = msg->method();
+                 std::unique_lock<std::mutex> lock(_mutex);
+                  if (optype == ServiceOptype::SERVICE_ONLINE){
+                    //服务上线请求
+                    auto it = _method_hosts.find(method);
+                    if (it == _method_hosts.end()) {
+                         auto method_host = std::make_shared<MethodHost>();
+                         method_host->appendHost(msg->host());
+                         _method_hosts[method] = method_host;
+                    }
+                    else{
+                        it->second->appendHost(msg->host());
+                    }
+                 }
+                 else if (optype == ServiceOptype::SERVICE_OFFLINE){
+                    //服务下线请求
+                    auto it = _method_hosts.find(method);
+                    // 找到了删
+                    if (it != _method_hosts.end()) {
+                        it->second->removeHost(msg->host());
+                        _offline_callback(msg->host());
+                    }
+                    else{
+                        std::cout << "服务下线失败！没有找到该服务的主机！\n";
+                    }
+                 }
             }
             private:
                 std::mutex _mutex;

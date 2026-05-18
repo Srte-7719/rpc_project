@@ -56,7 +56,7 @@ namespace json_rpc {
     //服务操作类型
     enum class ServiceOptype {
         SERVICE_REGISTRY = 0,//注册服务
-        SERVICE_DISCOVER,//发现服务
+        SERVICE_DISCOVERY,//发现服务
         SERVICE_ONLINE,//服务上线
         SERVICE_OFFLINE,//服务下线
         SERVICE_UNKNOW,//未知操作类型

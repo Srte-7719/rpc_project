@@ -62,9 +62,9 @@ namespace json_rpc
     //缓冲区工厂类，用于创建缓冲区对象
     class BufferFactory{
       public:
-      template<typename T, typename ...Arg>
-      static std::shared_ptr<T> create(Arg&&... args) {
-        return std::make_shared<T>(std::forward<Arg>(args)...);
+      template<typename ...Args>
+      static BaseBuffer::ptr create(Args&& ...args) {
+        return std::make_shared<MuduoBuffer>(std::forward<Args>(args)...);
     }
 };
 
@@ -150,14 +150,13 @@ namespace json_rpc
     };
 
     //协议工厂类
-      class ProtocolFactory{
-        public:
-         template<typename T, typename ...Arg>
-        static std::shared_ptr<T> create(Arg&&... args) {
-            return std::make_shared<T>(std::forward<Arg>(args)...);
-         }
+    class ProtocolFactory {
+    public:
+      template <typename... Args>
+      static BaseProtocol::ptr create(Args &&...args) {
+        return std::make_shared<LVProtocol>(std::forward<Args>(args)...);
+      }
     };
-
 
    class MuduoConnection: public BaseConnection{
         public:
@@ -184,15 +183,13 @@ namespace json_rpc
 
 
     //连接工厂类
-    class ConnectionFactory{
-        public:
-       template<typename T, typename ...Arg>
-        static std::shared_ptr<T> create(Arg&&... args) {
-            return std::make_shared<T>(std::forward<Arg>(args)...);
-        }
-    };
-
-
+ class ConnectionFactory {
+public:
+    template<typename ...Args>
+    static BaseConnection::ptr create(Args&& ...args) {
+        return std::make_shared<MuduoConnection>(std::forward<Args>(args)...);
+    }
+};
 
      class MuduoServer: public BaseServer{
         public:
@@ -221,7 +218,7 @@ namespace json_rpc
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                auto muduo_conn = ConnectionFactory::create<MuduoConnection>(_protocol, conn);
+                auto muduo_conn = ConnectionFactory::create(conn ,_protocol);
                 {
                   std::lock_guard<std::mutex> lock(_mutex); 
                   _connections.insert({conn->name(), muduo_conn});
@@ -310,16 +307,13 @@ namespace json_rpc
     };
 
     //服务器工厂类
-    class ServerFactory{
-        public:
-        template<typename T,typename ...Args>
-        static std::shared_ptr<T> create(Args&& ...args) {
-            return std::make_shared<T>(std::forward<Args>(args)...);
-        }
+    class ServerFactory {
+    public:
+      template <typename... Args>
+      static BaseServer::ptr create(Args &&...args) {
+        return std::make_shared<MuduoServer>(std::forward<Args>(args)...);
+      }
     };
-
-
-
 
        class MuduoClient : public BaseClient{
         public:
@@ -389,7 +383,7 @@ namespace json_rpc
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                _conn = ConnectionFactory::create<MuduoConnection>(_protocol, conn);//创建连接对象
+                _conn = ConnectionFactory::create(_protocol, conn);//创建连接对象
             }
             else
             {
@@ -443,12 +437,11 @@ namespace json_rpc
          const size_t _max_data_size = (1<<16);//最大消息大小
          std::mutex _mutex;
     };
-    class ClientFactory{
-        public:
-        template<typename T, typename ...Args>
-        static std::shared_ptr<T> create(Args&& ...args) {
-            return std::make_shared<T>(std::forward<Args>(args)...);
-        }
+    class ClientFactory {
+    public:
+      template <typename... Args>
+      static BaseClient::ptr create(Args &&...args) {
+        return std::make_shared<MuduoClient>(std::forward<Args>(args)...);
+      }
     };
-
 }

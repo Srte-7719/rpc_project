@@ -180,7 +180,7 @@ namespace  json_rpc {
                     _providers->addProvider(conn, msg->host(), msg->method());
                     _discoverers->onlineNotify(msg->method(), msg->host());
                     return registryResponse(conn, msg);
-                }else if (optype == ServiceOptype::SERVICE_DISCOVER){
+                }else if (optype == ServiceOptype::SERVICE_DISCOVERY){
                     //服务发现
                     LOG_INFO("客户端要进行 %s 服务发现！", msg->method().c_str());
                     _discoverers->addDiscoverer(conn, msg->method());
@@ -226,7 +226,7 @@ namespace  json_rpc {
                     auto msg_rsp = MessageFactory::create<ServiceResponse>();
                     msg_rsp->setId(msg->rid());
                     msg_rsp->setMtype(MType::RSP_SERVICE);
-                    msg_rsp->setOptype(ServiceOptype::SERVICE_DISCOVER);
+                    msg_rsp->setOptype(ServiceOptype::SERVICE_DISCOVERY);
                     std::vector<Address> hosts = _providers->methodHosts(msg->method());
                     if (hosts.empty()) {
                         msg_rsp->setRcode(RCode::RCODE_NOT_FOUND_SERVICE);

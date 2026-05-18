@@ -304,7 +304,7 @@ namespace json_rpc {
                     return false;
                 }
                 // 检查发现服务响应字段检测
-                if (_body[KEY_OPTYPE].asInt() == static_cast<int>(ServiceOptype::SERVICE_DISCOVER)) 
+                if (_body[KEY_OPTYPE].asInt() == static_cast<int>(ServiceOptype::SERVICE_DISCOVERY)) 
                 {
                   if (_body[KEY_METHOD].isNull() || !_body[KEY_METHOD].isString()) 
                   {

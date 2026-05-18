@@ -4,9 +4,6 @@
 
 namespace json_rpc
 {
-    //回调函数基类
-    //所有回调函数都必须继承自这个基类
-    //回调函数必须实现onMessage方法
     class Callback{
         public:
             using ptr = std::shared_ptr<Callback>;
