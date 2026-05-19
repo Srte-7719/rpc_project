@@ -20,12 +20,12 @@ namespace  json_rpc {
                 using ParamsDescribe = std::pair<std::string,VType>;
 
                 //构造函数
-                ServiceDescribe(std::string &&name,std::vector<ParamsDescribe> &&desc, VType vtype,ServiceCallback &&handler)
-                :_method_name(std::move(name)),
-                _params_describe(std::move(desc)),
-                _return_type(vtype),
-                _callback(std::move(handler))
+                ServiceDescribe(std::string &&mname, std::vector<ParamsDescribe> &&desc, 
+                    VType vtype, ServiceCallback &&handler) : 
+                    _method_name(std::move(mname)),_callback(std::move(handler)), 
+                    _params_describe(std::move(desc)), _return_type(vtype)
                 {}
+
                 const std::string& method() const { return _method_name; }
                 //执行业务回调，并检查返回值类型
                  bool paramCheck(const Json::Value &params) const{
@@ -40,11 +40,16 @@ namespace  json_rpc {
                             return false;
                         }
                     }
+                    return true;
                 }
 
                 bool call(const Json::Value &params, Json::Value &result) {
-                     _callback(params, result);
-                     return rtypeCheck(result);
+                    _callback(params, result);
+                    if (rtypeCheck(result) == false) {
+                        LOG_ERROR("回调处理函数中的响应信息校验失败！");
+                        return false;
+                    }
+                    return true;
                 }
 
 
@@ -85,7 +90,7 @@ namespace  json_rpc {
             public:
                 void setMethodName(const std::string &name) { _method_name = name; }
                 void setReturnType(VType vtype) { _return_type = vtype; }
-                void setParamsDescribe(const std::vector<ServiceDescribe::ParamsDescribe> &desc) { _params_describe = desc; }
+                void setParamsDescribe(const std::string &pname, VType vtype) {  _params_describe.push_back(ServiceDescribe::ParamsDescribe(pname, vtype)); }
                 void setCallback(ServiceDescribe::ServiceCallback cb) { _callback = cb; }
                 ServiceDescribe::ptr build() {
                     return std::make_shared<ServiceDescribe>(std::move(_method_name), std::move(_params_describe), _return_type, std::move(_callback));

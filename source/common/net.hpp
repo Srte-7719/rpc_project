@@ -1,5 +1,5 @@
 #pragma once
-#include "logger.h"
+#include "base/logger.hpp"
 #include "abstract.hpp"
 #include "fields.hpp"
 #include "message.hpp"
@@ -76,10 +76,13 @@ namespace json_rpc
          
         //检查是否可以处理消息
         virtual bool canProcessed(const BaseBuffer::ptr &buffer) override {
-            int32_t total_len = buffer->peekInt32();//查看的是消息长度
             //检查是否还有足够的数据
-            if(buffer->readableSize() < (total_len)) {
+            if(buffer->readableSize() < (lenFieldsLength)) {
                 return false;
+            }
+            int32_t total_len = buffer->peekInt32();
+            if (buffer->readableSize() < (total_len + lenFieldsLength)) {
+                    return false;
             }
             return true;
          }//检查是否可以处理消息
@@ -162,7 +165,8 @@ namespace json_rpc
         public:
             using ptr = std::shared_ptr<MuduoConnection>;
             //构造函数
-            MuduoConnection(const BaseProtocol::ptr &protocol, const muduo::net::TcpConnectionPtr &conn) : _protocol(protocol), _conn(conn) {
+            MuduoConnection(const muduo::net::TcpConnectionPtr &conn,const BaseProtocol::ptr &protocol)
+             : _protocol(protocol), _conn(conn) {
             }
             //发送消息
             virtual void send(const BaseMessage::ptr& msg) override{
@@ -195,22 +199,17 @@ public:
         public:
             using ptr = std::shared_ptr<MuduoServer>;
             //构造函数
-         MuduoServer(int port, const BaseProtocol::ptr &protocol)
-            : _server(&_baseloop, muduo::net::InetAddress("0.0.0.0", port),"MuduoServer",muduo::net::TcpServer::kNoReusePort), _protocol(protocol)
-            {
-               _server.setConnectionCallback(std::bind(&MuduoServer::onConnection, this, std::placeholders::_1));// 设置连接回调函数
-               _server.setMessageCallback(std::bind(&MuduoServer::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));// 设置消息回调函数
-               LOG_INFO("服务器启动成功");
+            MuduoServer(int port) : 
+            _server(&_baseloop, muduo::net::InetAddress("0.0.0.0", port), 
+                "MuduoServer", muduo::net::TcpServer::kReusePort),
+            _protocol(ProtocolFactory::create()){}
+            virtual void start() {
+                _server.setConnectionCallback(std::bind(&MuduoServer::onConnection, this, std::placeholders::_1));
+                _server.setMessageCallback(std::bind(&MuduoServer::onMessage, this, 
+                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                _server.start();//开始监听
+                _baseloop.loop();//开始死循环事件监控
             }
-
-
-            virtual void start() override 
-            {
-               _server.start();
-               LOG_INFO("服务器启动成功");
-               _baseloop.loop(); // 阻塞在这里，等待事件
-            }
-         
 
          private:
          void onConnection(const muduo::net::TcpConnectionPtr &conn)
@@ -218,15 +217,12 @@ public:
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                auto muduo_conn = ConnectionFactory::create(conn ,_protocol);
+                auto muduo_conn = ConnectionFactory::create(conn,_protocol);
                 {
                   std::lock_guard<std::mutex> lock(_mutex); 
-                  _connections.insert({conn->name(), muduo_conn});
+                  _connections.insert(std::make_pair(conn, muduo_conn));
                 }
-                if(_cb_connection)
-                {
-                  _cb_connection(muduo_conn);
-                }
+                 if (_cb_connection) _cb_connection(muduo_conn);
             }
             else
             {
@@ -234,7 +230,7 @@ public:
                 BaseConnection::ptr muduo_conn;
                 {
                   std::lock_guard<std::mutex> lock(_mutex); 
-                  auto it = _connections.find(conn->name());
+                  auto it = _connections.find(conn);
                   if(it == _connections.end())
                   {
                      return; // 连接不存在，直接返回
@@ -254,19 +250,8 @@ public:
          //消息回调函数
          void onMessage(const muduo::net::TcpConnectionPtr &conn, muduo::net::Buffer *buf, muduo::Timestamp receiveTime)
             {
-
-
-              auto base_buf = BufferFactory::create<MuduoBuffer>(buf);//创建缓冲区对象
-              BaseConnection::ptr base_conn;
-              {
-                std::lock_guard<std::mutex> lock(_mutex);
-                auto it = _connections.find(conn->name());
-                if(it == _connections.end())
-                {
-                  return; // 连接不存在，直接返回
-                }
-                base_conn = it->second;//获取连接对象
-              }
+               LOG_INFO("连接有数据到来，开始处理！");
+              auto base_buf = BufferFactory::create(buf);//创建缓冲区对象
               while(1)
               {
                if(_protocol->canProcessed(base_buf) == false)
@@ -276,7 +261,7 @@ public:
                   {
                     conn->shutdown();//关闭连接
                     LOG_ERROR("连接关闭缓冲区数据大小超过最大消息大小");
-                    break;
+                     return ;
                   }
                  break;
                }
@@ -287,13 +272,22 @@ public:
                {
                   conn->shutdown();
                   LOG_ERROR("缓存区数据错误");
-                  break;
+                  return ;
                }
-               if(_cb_message)
+               // 消息反序列化成功
+               BaseConnection::ptr base_conn;
                {
-                  _cb_message(base_conn, msg);
+                 std::unique_lock<std::mutex> lock(_mutex);
+                 auto it = _connections.find(conn);
+                 if (it == _connections.end()) {
+                   conn->shutdown();
+                   return;
+                 }
+                 base_conn = it->second;
                }
-               continue;//继续解析下一个消息
+               // 调用回调函数进行消息处理
+               if (_cb_message)
+                 _cb_message(base_conn, msg);
             }
          }
          
@@ -303,7 +297,7 @@ public:
             muduo::net::EventLoop _baseloop;
             muduo::net::TcpServer _server;
             std::mutex _mutex;
-            std::unordered_map<std::string, BaseConnection::ptr> _connections;
+            std::unordered_map<muduo::net::TcpConnectionPtr, BaseConnection::ptr> _connections;
     };
 
     //服务器工厂类
@@ -319,23 +313,15 @@ public:
         public:
             using ptr = std::shared_ptr<MuduoClient>;
             //构造函数
-            MuduoClient(const std::string &ip, int sport, const BaseProtocol::ptr &protocol):
-            _protocol(protocol),//创建协议对象
-            _loopthread(),//创建事件循环线程
-            _downlatch(1),//初始化计数器为1，因为为0时才会唤醒
-            _baseloop(_loopthread.startLoop()),
-            _client(_baseloop, muduo::net::InetAddress(ip, sport), "MuduoClient")
-        {}
-
-            ~MuduoClient()
-            {
-                  if (connected()) {
-                  shutdown();
-                  }
-            }
+            MuduoClient(const std::string &sip, int sport):
+                _protocol(ProtocolFactory::create()),
+                _baseloop(_loopthread.startLoop()),
+                _downlatch(1),
+                _client(_baseloop, muduo::net::InetAddress(sip, sport), "MuduoClient"){}
 
             virtual void connect() override 
             {
+               LOG_INFO("设置回调函数，连接服务器");
                //设置连接事件（连接建立/管理）的回调
                _client.setConnectionCallback(std::bind(&MuduoClient::onConnection, this, std::placeholders::_1));
                //设置连接消息的回调
@@ -344,6 +330,7 @@ public:
                //连接服务器
                _client.connect();
                _downlatch.wait();
+               LOG_INFO("连接服务器成功！");
             }
 
 
@@ -371,19 +358,16 @@ public:
                return _conn != nullptr && _conn->connected() == true;
             }
             
-            virtual void setMessageCallback(const MessageCallback& cb) override {
-               _cb_message = cb;
-            }
-
-          private:
-    //状态判断
+         private:
+      //状态判断
         void onConnection(const muduo::net::TcpConnectionPtr &conn)
         {
          _downlatch.countDown();//唤醒等待线程
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                _conn = ConnectionFactory::create(_protocol, conn);//创建连接对象
+                _downlatch.countDown();
+                _conn = ConnectionFactory::create(conn,_protocol);//创建连接对象
             }
             else
             {

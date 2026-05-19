@@ -1,4 +1,4 @@
-#include "../common/dispatcher.hpp"
+#include "../common/dispatcher/dispatcher.hpp"
 #include "../client/rpc_client.hpp"
 #include "rpc_router.hpp"
 #include "rpc_registry.hpp"
@@ -69,6 +69,7 @@ namespace json_rpc {
                     _server->setMessageCallback(message_cb);
                 }
 
+                //注册rpc方法
                 void registerMethod(const ServiceDescribe::ptr &service) {
                     if (_enableRegistry) {
                         _reg_client->registryMethod(service->method(), _access_addr);
@@ -94,15 +95,15 @@ namespace json_rpc {
                     _topic_manager(std::make_shared<TopicManager>()),
                     _dispatcher(std::make_shared<json_rpc::Dispatcher>())
                 {
-                    auto topic_cb = std::bind(&TopicManager::onTopicRequest, _topic_manager.get(),
-                        std::placeholders::_1, std::placeholders::_2);
+                    auto topic_cb = std::bind(&TopicManager::onTopicRequest, _topic_manager.get(),std::placeholders::_1, std::placeholders::_2);
                     _dispatcher->registerHandler<TopicRequest>(MType::REQ_TOPIC, topic_cb);
 
-                    _server = json_rpc::ServerFactory::create(port);
+                    _server = json_rpc::ServerFactory::create(port);//监听客户端连接
+                    //收到客户端消息 → 交给分发器
                     auto message_cb = std::bind(&json_rpc::Dispatcher::onMessage, _dispatcher.get(), 
                         std::placeholders::_1, std::placeholders::_2);
                     _server->setMessageCallback(message_cb);
-
+                    //客户端断开连接 → 调用自己的onConnShutdown方法
                     auto close_cb = std::bind(&TopicServer::onConnShutdown, this, std::placeholders::_1);
                     _server->setCloseCallback(close_cb);
                 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "../common/net.hpp"
 #include "../common/message.hpp"
-#include "../common/uuid.h"
+#include "../common/base/uuid.hpp"
 #include "source/common/abstract.hpp"
 #include "source/common/fields.hpp"
 #include <future>

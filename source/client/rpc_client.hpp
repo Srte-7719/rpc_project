@@ -1,7 +1,8 @@
-#include "../common/dispatcher.hpp"
+#include "../common/dispatcher/dispatcher.hpp"
 #include "requestor.hpp"
 #include "rpc_caller.hpp"
 #include "rpc_registry.hpp"
+#include "rpc_topic.hpp"
 //客户端封装
 namespace json_rpc {
     namespace client {
@@ -26,7 +27,7 @@ namespace json_rpc {
                 }
 
                  //对提供的服务注册接口
-                bool serviceDiscovery(const std::string &method, Address &host) {
+                bool registryMethod(const std::string &method, const Address &host) {
                     return _provider->registryMethod(_client->connection(), method, host);
                 }
             private:
@@ -67,7 +68,7 @@ namespace json_rpc {
             public:
                 using ptr = std::shared_ptr<RpcClient>;
                  RpcClient(bool enableDiscovery, const std::string &ip, int port):
-                  _enableDiscovery(enableDiscovery),_requestor(std::make_shared<Requestor>()),_dispatcher(std::make_shared<Dispatcher>()),_caller(std::make_shared<bitrpc::client::RpcCaller>(_requestor)) {
+                  _enableDiscovery(enableDiscovery),_requestor(std::make_shared<Requestor>()),_dispatcher(std::make_shared<Dispatcher>()),_caller(std::make_shared<json_rpc::client::RpcCaller>(_requestor)) {
                      //针对rpc请求后的响应进行的回调处理
                     auto rsp_cb = std::bind(&client::Requestor::onResponse, _requestor.get(), std::placeholders::_1, std::placeholders::_2);
                      _dispatcher->registerHandler<BaseMessage>(MType::RSP_RPC, rsp_cb);

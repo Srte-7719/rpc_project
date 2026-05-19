@@ -8,7 +8,7 @@ namespace json_rpc {
                 using ptr = std::shared_ptr<RpcCaller>;
                 using JsonAsyncResponse = std::future<Json::Value>;//异步响应
                 using JsonResponseCallback = std::function<void(const Json::Value& rsp)>;//响应回调 
-                
+                RpcCaller(const Requestor::ptr &requestor): _requestor(requestor){}
                 //同步调用，请求服务器响应，返回响应结果
                 bool call(const BaseConnection::ptr &conn, const std::string &method,const Json::Value &params, Json::Value &result)
                 {

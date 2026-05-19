@@ -1,8 +1,8 @@
 #pragma once
 #include "../common/net.hpp"
 #include "../common/message.hpp"
-#include "../common/uuid.h"
-#include "source/common/logger.h"
+#include "../common/base/uuid.hpp"
+#include "../common/base/logger.hpp"
 #include <json/json.h>
 #include <string>
 #include <vector>
@@ -39,7 +39,8 @@ namespace  json_rpc {
                         {
                             std::unique_lock<std::mutex> lock(_mutex);
                             auto it = _conns.find(c);
-                            if (it != _conns.end()) {
+                            if (it != _conns.end()) 
+                            {
                                 provider = it->second;
                             }else {
                                 provider = std::make_shared<Provider>(c, h);
