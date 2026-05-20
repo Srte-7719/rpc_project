@@ -81,7 +81,7 @@ namespace json_rpc
                 return false;
             }
             int32_t total_len = buffer->peekInt32();
-            if (buffer->readableSize() < (total_len + lenFieldsLength)) {
+            if (buffer->readableSize() < (total_len)) {
                     return false;
             }
             return true;
@@ -99,7 +99,13 @@ namespace json_rpc
             std::string id = buffer->retrieveAsString(idlen);
             //读取消消息体
            int32_t bodylen = total_len - (lenFieldsLength + mtypeFieldsLength + idtypeFieldsLength + idlen);
-            std::string body = buffer->retrieveAsString(bodylen);
+           //长度不合法直接断开 
+           if (bodylen < 0 || bodylen > static_cast<int32_t>(_max_data_size)) {
+               LOG_ERROR("协议错误bodylen = %d", bodylen);
+               return false;
+            } 
+           
+           std::string body = buffer->retrieveAsString(bodylen);
 
             msg = MessageFactory::create(mytype);
             if(msg.get() == nullptr) {
@@ -132,11 +138,12 @@ namespace json_rpc
             int32_t mtype_net = htonl((int32_t)msg->mtype());//转换为网络字节序的整数//消息类型字段长度
             int32_t idlen_net = htonl(id.size());//转换为网络字节序的整数//消息ID长度字段长度
             
-            int32_t total_len_net = htonl(lenFieldsLength + mtypeFieldsLength + idtypeFieldsLength + id.size() + body.size());
+           int32_t total_len = lenFieldsLength + mtypeFieldsLength + idtypeFieldsLength + id.size() + body.size();
             //转换为网络字节序的整数,消息总字段长度
-
+            int32_t total_len_net = htonl(total_len);   // 用于网络传输的字段
+            
             std::string result;
-            result.reserve(total_len_net);
+            result.reserve(total_len); 
             result.append((char*)&total_len_net, lenFieldsLength);//消息总字段长度
             result.append((char*)&mtype_net, mtypeFieldsLength);//消息类型字段长度
             result.append((char*)&idlen_net, idtypeFieldsLength);//消息ID长度字段长度
@@ -150,6 +157,7 @@ namespace json_rpc
             const size_t lenFieldsLength = 4;//消息长度字段长度
             const size_t mtypeFieldsLength = 4;//消息类型字段长度
             const size_t idtypeFieldsLength = 4;//消息ID长度字段长度
+            const size_t _max_data_size = (1 << 16);
     };
 
     //协议工厂类
@@ -241,6 +249,7 @@ public:
 
                 if(_cb_close)
                 {
+                  LOG_DEBUG("正在调用关闭回调函数");
                   _cb_close(muduo_conn);
                 }//调用关闭回调函数
             }
@@ -317,6 +326,7 @@ public:
                 _protocol(ProtocolFactory::create()),
                 _baseloop(_loopthread.startLoop()),
                 _downlatch(1),
+                _connect_success(false),
                 _client(_baseloop, muduo::net::InetAddress(sip, sport), "MuduoClient"){}
 
             virtual void connect() override 
@@ -330,7 +340,12 @@ public:
                //连接服务器
                _client.connect();
                _downlatch.wait();
-               LOG_INFO("连接服务器成功！");
+               if (!_connect_success) {
+                 LOG_ERROR("连接服务器失败！");
+                 _conn.reset();
+               } else {
+                 LOG_INFO("连接服务器成功！");
+               }
             }
 
 
@@ -362,17 +377,20 @@ public:
       //状态判断
         void onConnection(const muduo::net::TcpConnectionPtr &conn)
         {
-         _downlatch.countDown();//唤醒等待线程
             if(conn->connected())
             {
                 std::cout << "连接建立！" << std::endl;
-                _downlatch.countDown();
+                _connect_success = true;
+
                 _conn = ConnectionFactory::create(conn,_protocol);//创建连接对象
+                _downlatch.countDown();
             }
             else
             {
                 std::cout << "连接关闭！" << std::endl;
                 _conn.reset();//重置关闭连接对象
+                _connect_success = false;
+                _downlatch.countDown(); 
             }
         }
         void onMessage(const muduo::net::TcpConnectionPtr &conn, muduo::net::Buffer *buf, muduo::Timestamp receiveTime)
@@ -413,6 +431,7 @@ public:
          private:
          BaseProtocol::ptr _protocol;//协议对象
          BaseConnection::ptr _conn;
+         bool _connect_success;
          muduo::CountDownLatch _downlatch;
          muduo::net::EventLoopThread _loopthread;//事件循环线程
          muduo::net::EventLoop *_baseloop;

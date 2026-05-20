@@ -14,11 +14,10 @@ int main()
     for (int i = 0; i < 10; i++)
     {
         ret = client->publish("hello", "hello world " + std::to_string(i));
-        if(!ret)
-        {
+        if (!ret) {
             LOG_ERROR("发布消息失败");
         }
-        client->shutdown();
     }
+    client->shutdown();
 
 }

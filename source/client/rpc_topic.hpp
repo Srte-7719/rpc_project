@@ -68,13 +68,18 @@ namespace json_rpc {
                     }
                     return it->second;
                  }
+
                 bool commonRequest(const BaseConnection::ptr &conn, const std::string &key, TopicOptype type, const std::string &msg = "") {
                      //构造请求对象填充数据
                     auto msg_req = std::make_shared<TopicRequest>();
                     msg_req->setId(UUID::generate_uuid());
                     msg_req->setMtype(MType::REQ_TOPIC);
-                    msg_req->setTopicOptype(TopicOptype::TOPIC_CREATE);
+                    msg_req->setTopicOptype(type);
+
                     msg_req->setTopicKey(key);
+                    if (!msg.empty()) {
+                        msg_req->setTopicMsg(msg);
+                    }
                     //发送等待服务器相应
                     BaseMessage::ptr msg_rsp;
                     bool ret = _requestor->send(conn, msg_req, msg_rsp);

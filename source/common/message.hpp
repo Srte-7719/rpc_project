@@ -7,7 +7,6 @@
 
 namespace json_rpc {
         typedef std::pair<std::string, int> Address;
-
         //Json消息
     class JsonMessage : public BaseMessage{
         public:
@@ -338,7 +337,7 @@ namespace json_rpc {
                 _body[KEY_METHOD] = method_name;
             }
             //设置主机信息
-            void setHost(std::vector<Address>& addrs)
+            void setHost(const std::vector<Address>& addrs)
             {
                 _body[KEY_HOST] = Json::Value(Json::arrayValue);//先清空为新数组
                 for(auto addr: addrs)//遍历主机信息

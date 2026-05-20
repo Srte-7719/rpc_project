@@ -112,11 +112,15 @@ namespace json_rpc {
                 }
             private:
                 BaseClient::ptr newClient(const Address &host) {
-                    auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), 
-                        std::placeholders::_1, std::placeholders::_2);
                     auto client = ClientFactory::create(host.first, host.second);
+                    auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), 
+                    std::placeholders::_1, std::placeholders::_2);
                     client->setMessageCallback(message_cb);
                     client->connect();
+                    if (!client->connected()) {
+                        LOG_ERROR("无法连接到服务提供者 %s:%d", host.first.c_str(), host.second);
+                        return nullptr;
+                    }
                     putClient(host, client);
                     return client;
                 }
@@ -130,6 +134,7 @@ namespace json_rpc {
                 }
                 BaseClient::ptr getClient(const std::string method) {
                     BaseClient::ptr client;
+                    
                     if (_enableDiscovery) {
                         //1. 通过服务发现，获取服务提供者地址信息
                         Address host;
@@ -140,6 +145,13 @@ namespace json_rpc {
                         }
                         //2. 查看服务提供者是否已有实例化客户端，有则直接使用，没有则创建
                         client = getClient(host);
+                        if (!client) {
+                            client = newClient(host);
+                            if (!client) {
+                                LOG_ERROR("创建到 %s:%d 的客户端失败", host.first.c_str(), host.second);
+                                return nullptr;
+                            }
+                        }
                         if (client.get() == nullptr) {//没有找打已实例化的客户端，则创建
                             client = newClient(host);
                         }

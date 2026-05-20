@@ -18,7 +18,6 @@ namespace json_rpc {
                         std::placeholders::_1, std::placeholders::_2);
                     _dispatcher->registerHandler<ServiceRequest>(MType::REQ_SERVICE, service_cb);
 
-                    
                     _server = json_rpc::ServerFactory::create(port);
                     auto message_cb = std::bind(&json_rpc::Dispatcher::onMessage, _dispatcher.get(), 
                         std::placeholders::_1, std::placeholders::_2);

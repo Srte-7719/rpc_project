@@ -78,7 +78,14 @@ namespace  json_rpc {
                         }
                         return hosts;
                     }
-                    Provider::ptr getProvider(const BaseConnection::ptr &c);//当服务提供者连接关闭时，获取他的信息
+                    Provider::ptr getProvider(const BaseConnection::ptr &c){
+                        std::unique_lock<std::mutex> lock(_mutex);
+                        auto it = _conns.find(c);
+                        if (it != _conns.end()) {
+                           return it->second;
+                        }
+                         return Provider::ptr();
+                    }//当服务提供者连接关闭时，获取他的信息
                 private:
                     std::mutex _mutex;//保护_providers
                     std::unordered_map<std::string, std::set<Provider::ptr>> _providers;//提供提供者
@@ -127,7 +134,7 @@ namespace  json_rpc {
                     return;
                 }
                 for (auto &method : it->second->methods) {
-                    auto discoverers = _discoverers[method];
+                    auto& discoverers = _discoverers[method];
                     discoverers.erase(it->second);
                 }
                 _conns.erase(it); //删除连接与发现者的关联关系
@@ -231,6 +238,8 @@ namespace  json_rpc {
                     std::vector<Address> hosts = _providers->methodHosts(msg->method());
                     if (hosts.empty()) {
                         msg_rsp->setRcode(RCode::RCODE_NOT_FOUND_SERVICE);
+                        msg_rsp->setMethod(msg->method());//否则客户端校验失败
+                        msg_rsp->setHost(std::vector<Address>());
                         return conn->send(msg_rsp);
                     }
                     msg_rsp->setRcode(RCode::RCODE_OK);

@@ -51,11 +51,7 @@ namespace  json_rpc {
                     }
                     return true;
                 }
-
-
-
             private:
-
                 bool rtypeCheck(const Json::Value &val) const 
                 {
                     return check(_return_type, val);
@@ -164,10 +160,7 @@ namespace  json_rpc {
                 msg->setResult(res);
                 conn->send(msg);
               }
-            
               ServiceManager::ptr _service_manager;
-                
-
         };
     
     }
