@@ -1,6 +1,6 @@
 #pragma once
-#include "../net.hpp"
-#include "../message.hpp"
+#include "../net/net.hpp"
+#include "../net/message.hpp"
 
 namespace json_rpc
 {

@@ -1,6 +1,6 @@
 #pragma once
 #include "requestor.hpp"
-#include "source/common/message.hpp"
+#include "../common/net/message.hpp"
 #include <unordered_set>
 
 namespace json_rpc {
@@ -65,7 +65,6 @@ namespace json_rpc {
 
                 //选择主机
                 Address chooseHost() {
-                    //选择主机
                     std::unique_lock<std::mutex> lock(_mutex);
                     size_t pos = _idx++ % _hosts.size();
                     return _hosts[pos];//原子性不用_idx = (_idx + 1) % _hosts.size();

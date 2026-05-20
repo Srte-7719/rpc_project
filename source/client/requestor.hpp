@@ -1,9 +1,9 @@
 #pragma once
-#include "../common/net.hpp"
-#include "../common/message.hpp"
+#include "../common/net/net.hpp"
+#include "../common/net/message.hpp"
 #include "../common/base/uuid.hpp"
-#include "source/common/abstract.hpp"
-#include "source/common/fields.hpp"
+#include "../common/net/abstract.hpp"
+#include "../common/base/fields.hpp"
 #include <future>
 #include <functional>
 
@@ -15,7 +15,7 @@ namespace json_rpc {
         class Requestor{
             public:
               // 请求描述
-              // 描述一个请求，包括请求消息、返回值类型、异步调用响应、异步调用回调函数
+              // 描述请求(请求消息、返回值类型、异步调用响应、异步调用回调函数)
               struct RequestDescribe {
                 using ptr = std::shared_ptr<RequestDescribe>;
                 BaseMessage::ptr request;                // 请求消息
@@ -28,12 +28,11 @@ namespace json_rpc {
                 using AsyncResponse = std::future<BaseMessage::ptr>;//异步调用的响应
 
             //处理响应
-            //根据 rid 查找请求描述，设置响应
             void onResponse(const BaseConnection::ptr &conn, BaseMessage::ptr &msg) {
                std::string rid = msg->rid();//从响应里取出rid
                 RequestDescribe::ptr rdp = getDescribe(rid);//根据rid查找对应的请求描述
                 if (!rdp) {
-                    LOG_ERROR("收到响应 - %s，但是未找到对应的请求！", rid.c_str());
+                    LOG_ERROR("收到响应 - %s 但是未找到对应的请求!", rid.c_str());
                     return;
                 }
                 if (rdp->rtype == RType::REQ_ASYNC) {
@@ -49,11 +48,10 @@ namespace json_rpc {
                 else {
                     LOG_ERROR("未知的请求类型！");
                 }
-                delDescribe(rid);//删除请求描述
+                delDescribe(rid);
             }
 
             //发送请求
-            //返回值是异步调用的响应
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, AsyncResponse &async_rsp) {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_ASYNC);
                 if (!rdp) {
@@ -65,8 +63,7 @@ namespace json_rpc {
                 return true;
             }
 
-            //发送请求，等待响应
-            //阻塞等待异步调用响应
+            //同步阻塞等待结果
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, BaseMessage::ptr &rsp) {
                 AsyncResponse rsp_future;
                 bool ret = send(conn, req, rsp_future);
@@ -77,8 +74,7 @@ namespace json_rpc {
                 return true;
             }
 
-            //发送请求，等待响应
-            //阻塞等待异步调用响应
+            //异步回调不等待
             bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, const RequestCallback &cb) {
                 RequestDescribe::ptr rdp = newDescribe(req, RType::REQ_CALLBACK, cb);// 创建请求描述，类型是回调
                 if (!rdp) {

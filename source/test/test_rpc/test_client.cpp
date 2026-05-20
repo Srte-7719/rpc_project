@@ -1,4 +1,4 @@
-#include "../../common/net.hpp"
+#include "../../common/net/net.hpp"
 #include "../../common/base/uuid.hpp"
 #include "../../client/rpc_client.hpp"
 #include "source/common/base/logger.hpp"

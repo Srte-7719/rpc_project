@@ -1,7 +1,7 @@
 #pragma once
-#include "base/logger.hpp"
+#include "../base/logger.hpp"
 #include "abstract.hpp"
-#include "fields.hpp"
+#include "../base/fields.hpp"
 #include "message.hpp"
 #include <cstddef>// 定义size_t类型
 #include <linux/limits.h>// 限制文件路径长度

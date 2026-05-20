@@ -1,6 +1,6 @@
 #pragma once
-#include "../common/net.hpp"
-#include "../common/message.hpp"
+#include "../common/net/net.hpp"
+#include "../common/net/message.hpp"
 #include <unordered_set>
 namespace json_rpc {
     namespace server {

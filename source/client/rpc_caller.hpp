@@ -47,11 +47,10 @@ namespace json_rpc {
                     return true;
                 }
 
-                //异步调用：返回future<Json::Value>
+                //异步调用
                 bool call(const BaseConnection::ptr &conn, const std::string &method,const Json::Value &params,JsonAsyncResponse &result)
                 {
                     LOG_INFO("开始异步rpc调用...");
-                    //帮用户构造RpcRequest对象
                     auto req_msg = MessageFactory::create<RpcRequest>();
                     req_msg->setId(UUID::generate_uuid());//设置请求id
                     req_msg->setMtype(MType::REQ_RPC);//设置消息类型为rpc请求
@@ -84,7 +83,6 @@ namespace json_rpc {
                     req_msg->setParams(params);//设置参数
 
                     Requestor::RequestCallback req_cb = std::bind(&RpcCaller::handleCallbackResponse, this,  cb,std::placeholders::_1);
-                    //将请求消息发送给服务器，等待响应消息
                     bool ret = _requestor->send(conn, std::dynamic_pointer_cast<BaseMessage>(req_msg), req_cb);
                     if (ret == false){
                         LOG_ERROR("回调Rpc请求失败!");
@@ -97,14 +95,13 @@ namespace json_rpc {
                 //回调函数模式的辅助回调函数
                 void handleCallbackResponse(const JsonResponseCallback &cb,const BaseMessage::ptr &msg)
                 {
-                    //转成RpcResponse
                     auto rpc_rsp_msg = std::dynamic_pointer_cast<RpcResponse>(msg);
                     if (!rpc_rsp_msg) {
                         LOG_ERROR("rpc响应,向下类型转换失败!");
                         
                         return;
                     }
-                    // 帮用户检查错误码
+                    // 检查错误码
                     if (rpc_rsp_msg->rcode() != RCode::RCODE_OK) {
                         LOG_ERROR("Rpc调用失败,错误码:%d", (int)rpc_rsp_msg->rcode());
                         return;
@@ -128,11 +125,10 @@ namespace json_rpc {
                         promise->set_exception(std::make_exception_ptr(std::runtime_error("RPC调用失败")));
                         return;
                     }
-                    // 填充结果
                     promise->set_value(rpc_rsp_msg->result());
                 }
                 
-                Requestor::ptr _requestor;//所有底层请求都交给它处理
+                Requestor::ptr _requestor;
         };
     }
 

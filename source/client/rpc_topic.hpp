@@ -1,6 +1,6 @@
 #pragma once
 #include "requestor.hpp"
-#include "source/common/fields.hpp"
+#include "../common/base/fields.hpp"
 #include <unordered_set>
 
 namespace json_rpc {
@@ -40,10 +40,10 @@ namespace json_rpc {
                         LOG_ERROR("收到了错误类型的主题操作！");
                         return ;
                     }
-                    //2. 取出消息主题名称，以及消息内容
+                    //2. 取出消息主题名消息内容
                     std::string topic_key = msg->topicKey();
                     std::string topic_msg = msg->topicMsg();
-                    //3. 通过主题名称，查找对应主题的回调处理函数，有在处理，无在报错
+                    //3通过主题名称，查找对应主题的回调处理函数，有处理，无报错
                     auto callback = getSubscribe(topic_key);
                     if (!callback) {
                         LOG_ERROR("收到了 %s 主题消息，但是该消息无主题处理回调！", topic_key.c_str());

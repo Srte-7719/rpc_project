@@ -41,6 +41,7 @@ namespace json_rpc {
         class DiscoveryClient {
             public:
                 using ptr = std::shared_ptr<DiscoveryClient>;
+
                 DiscoveryClient(const std::string &ip, int port, const Discoverer::OfflineCallback &cb): 
                 _requestor(std::make_shared<Requestor>()),_discoverer(std::make_shared<client::Discoverer>(_requestor, cb)),_dispatcher(std::make_shared<Dispatcher>())
                 {
@@ -63,54 +64,65 @@ namespace json_rpc {
                 Dispatcher::ptr _dispatcher;
                 BaseClient::ptr _client;
         };
+
         //RPC客户端
         class RpcClient {
             public:
                 using ptr = std::shared_ptr<RpcClient>;
+                //1.初始化三大核心
                  RpcClient(bool enableDiscovery, const std::string &ip, int port):
-                  _enableDiscovery(enableDiscovery),_requestor(std::make_shared<Requestor>()),_dispatcher(std::make_shared<Dispatcher>()),_caller(std::make_shared<json_rpc::client::RpcCaller>(_requestor)) {
-                     //针对rpc请求后的响应进行的回调处理
+                  _enableDiscovery(enableDiscovery),
+                  _requestor(std::make_shared<Requestor>()),
+                  _dispatcher(std::make_shared<Dispatcher>()),
+                  _caller(std::make_shared<json_rpc::client::RpcCaller>(_requestor))
+                   {
+
+                    //2.注册RPC响应回调
                     auto rsp_cb = std::bind(&client::Requestor::onResponse, _requestor.get(), std::placeholders::_1, std::placeholders::_2);
                      _dispatcher->registerHandler<BaseMessage>(MType::RSP_RPC, rsp_cb);
-                    //如果启用了服务发现，地址信息是注册中心的地址，是服务发现客户端需要连接的地址，则通过地址信息实例化discovery_client
-                    //如果没有启用服务发现，则地址信息是服务提供者的地址，则直接实例化好rpc_client
+
+                    //两种初始化连接
+                    //1.启用服务发现 → ip:port 是注册中心地址
                     if (_enableDiscovery) {
                         auto offline_cb = std::bind(&RpcClient::delClient, this, std::placeholders::_1);
                         _discovery_client = std::make_shared<DiscoveryClient>(ip, port, offline_cb);
                     }else {
+                        // 不启用服务发现 → ip:port 是服务提供者地址
                         auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), 
                             std::placeholders::_1, std::placeholders::_2);
-                        _rpc_client = ClientFactory::create(ip, port);
-                        _rpc_client->setMessageCallback(message_cb);
+                        _rpc_client = ClientFactory::create(ip, port);// 创建网络客户端
+                        _rpc_client->setMessageCallback(message_cb);// 设置消息回调
                         _rpc_client->connect();
                     }
                   }
+                  // 1. 同步阻塞调用
                  bool call(const std::string &method, const Json::Value &params, Json::Value &result) {
-                    //获取服务提供者：1. 服务发现；  2. 固定服务提供者
+                    //获取服务提供者
                     BaseClient::ptr client = getClient(method);
                     if (client.get() == nullptr) {
                         return false;
                     }
-                    //3. 通过客户端连接，发送rpc请求
+                    //通过客户端连接，发送rpc请求
                     return _caller->call(client->connection(), method, params, result);
                 }
+                // 2. 异步Future调用
                 bool call(const std::string &method, const Json::Value &params, RpcCaller::JsonAsyncResponse &result) {
                     BaseClient::ptr client = getClient(method);
                     if (client.get() == nullptr) {
                         return false;
                     }
-                    //3. 通过客户端连接，发送rpc请求
                     return _caller->call(client->connection(), method, params, result);
                 }
+                // 3. 异步回调调用
                 bool call(const std::string &method, const Json::Value &params, const RpcCaller::JsonResponseCallback &cb) {
                     BaseClient::ptr client = getClient(method);
                     if (client.get() == nullptr) {
                         return false;
                     }
-                    //3. 通过客户端连接，发送rpc请求
                     return _caller->call(client->connection(), method, params, cb);
                 }
             private:
+                // 创建新客户端,连接服务端，加入连接池
                 BaseClient::ptr newClient(const Address &host) {
                     auto client = ClientFactory::create(host.first, host.second);
                     auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), 
@@ -124,6 +136,7 @@ namespace json_rpc {
                     putClient(host, client);
                     return client;
                 }
+                //连接池核心 → 客户端管理
                 BaseClient::ptr getClient(const Address &host) {
                     std::unique_lock<std::mutex> lock(_mutex);
                     auto it = _rpc_clients.find(host);
@@ -175,16 +188,20 @@ namespace json_rpc {
                         return std::hash<std::string>{}(addr);
                     }
                 };
-                bool _enableDiscovery;
-                DiscoveryClient::ptr _discovery_client;
-                Requestor::ptr _requestor;
-                RpcCaller::ptr _caller;
+                bool _enableDiscovery;// 服务发现开关
+                //服务发现客户端
+                DiscoveryClient::ptr _discovery_client;// 连接注册中心，查询服务地址
+                 //RPC通信核心发请求、收响应、匹配请求-响应
+                Requestor::ptr _requestor;// 管理所有RPC请求，匹请求→响应
+                RpcCaller::ptr _caller;// RPC调用封装器：序列化参数、发送请求、解析结果
                 Dispatcher::ptr _dispatcher;
-                BaseClient::ptr _rpc_client;//用于未启用服务发现
+
+                BaseClient::ptr _rpc_client;//客户端连接
                 std::mutex _mutex;
+                
                 //<"127.0.0.1:8080", client1>
-                std::unordered_map<Address, BaseClient::ptr, AddressHash> _rpc_clients;//用于服务发现的客户端连接池
-                //长连接短连接问题，这里用的什么链接？。短连接思，长连接思想，这里用的是长连接，开一个连接池
+                std::unordered_map<Address, BaseClient::ptr, AddressHash> _rpc_clients;//这里用的是长连接，用于服务发现的客户端连接池
+                //这里用的是长连接，开一个连接池
         };
 
 

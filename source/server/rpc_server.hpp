@@ -6,7 +6,7 @@
 
 namespace json_rpc {
     namespace server {
-        //注册中心服务端：只需要针对服务注册与发现请求进行处理即可
+        //注册中心服务端
         class RegistryServer {
             public:
                 using ptr = std::shared_ptr<RegistryServer>;
@@ -39,36 +39,37 @@ namespace json_rpc {
                 BaseServer::ptr _server;
         };
 
+        //业务服务端,接收 RpcClient 发来的 RPC 调用请求同时自动向注册中心注册服务
         class RpcServer {
             public:
                 using ptr = std::shared_ptr<RpcServer>;
-                //rpc——server端有两套地址信息：
-                //  1. rpc服务提供端地址信息--必须是rpc服务器对外访问地址（云服务器---监听地址和访问地址不同）
-                //  2. 注册中心服务端地址信息 -- 启用服务注册后，连接注册中心进行服务注册用的
+                //对外地址, 是否启用注册, 注册中心地址
+
                 RpcServer(const Address &access_addr, 
                     bool enableRegistry = false, 
                     const Address &registry_server_addr = Address()):
                     _enableRegistry(enableRegistry),
                     _access_addr(access_addr),
                     _router(std::make_shared<json_rpc::server::RpcRouter>()),
-                    _dispatcher(std::make_shared<json_rpc::Dispatcher>()) {
-                    
+                    _dispatcher(std::make_shared<json_rpc::Dispatcher>())
+                    {
+                        //启用注册
                     if (enableRegistry) {
                         _reg_client = std::make_shared<client::RegistryClient>(
                             registry_server_addr.first, registry_server_addr.second);
                     }
-                    //当前成员server是一个rpcserver，用于提供rpc服务的
+                    //注册rpc方法
                     auto rpc_cb = std::bind(&RpcRouter::onRpcRequest, _router.get(), 
                         std::placeholders::_1, std::placeholders::_2);
                     _dispatcher->registerHandler<json_rpc::RpcRequest>(json_rpc::MType::REQ_RPC, rpc_cb);
-
+                    //创建rpc服务端
                     _server = json_rpc::ServerFactory::create(access_addr.second);
                     auto message_cb = std::bind(&json_rpc::Dispatcher::onMessage, _dispatcher.get(), 
                         std::placeholders::_1, std::placeholders::_2);
                     _server->setMessageCallback(message_cb);
                 }
 
-                //注册rpc方法
+                //注册业务方法（比如 add、login、pay）
                 void registerMethod(const ServiceDescribe::ptr &service) {
                     if (_enableRegistry) {
                         _reg_client->registryMethod(service->method(), _access_addr);
@@ -79,9 +80,9 @@ namespace json_rpc {
                     _server->start();
                 }
             private:
-                bool _enableRegistry;
-                Address _access_addr;
-                client::RegistryClient::ptr _reg_client;
+                bool _enableRegistry;//是否启用服务注册
+                Address _access_addr;//rpc服务提供端地址信息
+                client::RegistryClient::ptr _reg_client;//服务注册客户端
                 RpcRouter::ptr _router;
                 Dispatcher::ptr _dispatcher;
                 BaseServer::ptr _server;

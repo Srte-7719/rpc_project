@@ -1,6 +1,6 @@
 #pragma once
-#include "../common/net.hpp"
-#include "../common/message.hpp"
+#include "../common/net/net.hpp"
+#include "../common/net/message.hpp"
 #include "../common/base/uuid.hpp"
 #include "../common/base/logger.hpp"
 #include <json/json.h>

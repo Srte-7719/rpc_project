@@ -1,8 +1,8 @@
 #pragma once
 #include "abstract.hpp"
-#include "fields.hpp"
-#include "base/json.hpp"
-#include "base/logger.hpp"
+#include "../base/fields.hpp"
+#include "../base/json.hpp"
+#include "../base/logger.hpp"
 #include <vector>
 
 namespace json_rpc {
